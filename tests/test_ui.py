@@ -23,7 +23,7 @@ class UITests(unittest.TestCase):
         adsk.core = ModuleType('adsk.core')
         adsk.fusion = ModuleType('adsk.fusion')
         for name in ('CommandCreatedEventHandler', 'CommandEventHandler', 'InputChangedEventHandler',
-                     'ValidateInputsEventHandler', 'CustomEventHandler', 'HTMLEventHandler', 'UserInterfaceGeneralEventHandler'):
+                     'ValidateInputsEventHandler', 'CustomEventHandler'):
             setattr(adsk.core, name, type(name, (), {}))
         self.fired = []
         self.project = NS(id='project', name='Project')
@@ -109,9 +109,6 @@ class UITests(unittest.TestCase):
         messages = []
         class Progress:
             wasCancelled = False
-            warnings = []
-            def poll(self):
-                pass
             def __setattr__(self, key, value):
                 if key == 'message':
                     messages.append(value)
@@ -137,10 +134,23 @@ class UITests(unittest.TestCase):
             adapter.enumerate = enumerate_files
             return adapter
         self.ui._queued = (dict(backup_directory=self.temp.name), [self.project])
-        with patch.object(self.ui, 'FusionAdapter', side_effect=factory), patch.object(self.ui, 'ProgressDisplay', return_value=progress):
+        with patch.object(self.ui, 'FusionAdapter', side_effect=factory):
             self.ui.Launch().notify(NS())
         self.assertTrue(any('Scanning Project' in text and '発見済み 1 件' in text for text in messages))
         self.assertTrue(any('SHA-256 を検証中' in text and 'Part' in text and 'F3D' in text for text in messages))
         self.assertTrue(any('完了 1 / 1' in text for text in messages))
         self.assertTrue(progress.hidden)
         self.assertFalse(self.ui._running)
+
+    def test_project_checkboxes_only_affect_selected_scope(self):
+        for option in self.inputs['projects'].listItems.items:
+            option.isSelected = False
+        for scope, expected in [(0, ['project', 'second']), (2, ['project'])]:
+            self.inputs['scope'].selectedItem.index = scope
+            args = NS(command=NS(commandInputs=self.inputs))
+            self.ui.Execute().notify(args)
+            self.assertEqual([p.id for p in self.ui._pending[1]], expected)
+        self.inputs['scope'].selectedItem.index = 1
+        self.inputs['projects'].listItems.items[1].isSelected = True
+        self.ui.Execute().notify(NS(command=NS(commandInputs=self.inputs)))
+        self.assertEqual([p.id for p in self.ui._pending[1]], ['second'])

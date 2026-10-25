@@ -35,3 +35,8 @@ Autodesk の [2026 年 9 月の更新情報](https://help.autodesk.com/view/fusi
 ## 左寄せ進捗表示（2026-10-26）
 
 [ProgressDialog](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/core_ProgressDialog.htm) にはテキスト配置のプロパティがない。[Palettes.add](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/core_Palettes_add.htm) と [HTML パレットの公式説明](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/Palettes_UM.htm) に従い、ローカル HTML を表示し CSS で左寄せを指定する。`sendInfoToHTML`、`incomingFromHTML`、`closed` を使う。HTML の受信準備が整うまで最新表示を保持し、ready 通知で送信する。閉じる操作も停止要求として扱う。追加の doEvents は行わず、既存の安全な区切りでのみイベント処理する。
+
+
+## 標準進捗画面への復帰（1.0.5、2026-10-26）
+
+ユーザーの方針により、HTML パレットの進捗表示を撤回し、1.0.2 の標準 ProgressDialog へ戻した。上記の HTML に関する記載は 1.0.3〜1.0.4 の調査履歴。現行版は HTML 通信を行わない。詳細な進捗テキストは progress.py のまま維持する。

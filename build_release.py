@@ -6,7 +6,7 @@ import zipfile
 
 def build():
     root = Path(__file__).resolve().parent
-    output = root / 'dist' / 'FusionBackupManager-1.0.4.zip'
+    output = root / 'dist' / 'FusionBackupManager-1.0.5.zip'
     output.parent.mkdir(exist_ok=True)
     with zipfile.ZipFile(output, 'w', zipfile.ZIP_DEFLATED) as archive:
         for source in sorted(root.rglob('*')):
@@ -20,7 +20,7 @@ def build():
     with zipfile.ZipFile(output) as archive:
         if archive.testzip() is not None:
             raise RuntimeError('Release ZIP integrity check failed')
-        for required in ('FusionBackupManager.py', 'FusionBackupManager.manifest', 'core.py', 'fusion_adapter.py', 'progress.py', 'progress_display.py', 'progress.html', 'LICENSE.FusionProjectExporter'):
+        for required in ('FusionBackupManager.py', 'FusionBackupManager.manifest', 'core.py', 'fusion_adapter.py', 'progress.py', 'LICENSE.FusionProjectExporter'):
             assert 'FusionBackupManager/FusionBackupManager/' + required in archive.namelist()
     print(output)
     print('SHA-256: ' + checksum)

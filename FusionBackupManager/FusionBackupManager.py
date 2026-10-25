@@ -8,7 +8,6 @@ import adsk.fusion
 from .core import Backup, DEFAULTS, atomic_json
 from .fusion_adapter import FusionAdapter, collection
 from .progress import progress_text
-from .progress_display import ProgressDisplay
 
 COMMAND = 'FusionBackupManagerButton'
 PANEL = 'FusionBackupManagerPanel'
@@ -46,7 +45,13 @@ class Created(adsk.core.CommandCreatedEventHandler):
             saved = settings()
             _projects = list(collection(app.data.dataProjects))
             inputs = args.command.commandInputs
-            inputs.addTextBoxCommandInput('notice', '', 'Saved cloud versions only. Open designs and their dependencies are skipped. Old backups are always kept. F3Z restore is manual and unverified.', 3, True)
+            notice = (
+                '保存済みのクラウド版をバックアップします。未保存の編集は含みません。\n'
+                '開いている設計やその参照先は保護のため出力せず、過去のバックアップは保持します。\n'
+                '外部参照のある設計は、手動のF3Z出力・復元確認が必要です。\n\n'
+                'Projects (multiple) は Selected Projects（複数選択）のときだけ反映されます。\n'
+                'All Projects（全プロジェクト）／Current Project（現在のプロジェクト）では無視されます。')
+            inputs.addTextBoxCommandInput('notice', '', notice, 8, True)
             scope = inputs.addDropDownCommandInput('scope', 'Backup Target', adsk.core.DropDownStyles.TextListDropDownStyle)
             for key, label in [('all', 'All Projects'), ('selected', 'Selected Projects'), ('current', 'Current Project')]:
                 scope.listItems.add(label, saved['backup_scope'] == key, '')
@@ -134,7 +139,7 @@ class Launch(adsk.core.CustomEventHandler):
         ui = app.userInterface
         panel = ui.allToolbarPanels.itemById(PANEL)
         control = panel.controls.itemById(COMMAND) if panel else None
-        progress = ProgressDisplay(ui)
+        progress = ui.createProgressDialog()
         progress.isCancelButtonShown = True
         progress.cancelButtonText = 'Stop Backup'
         counts = {}
@@ -150,7 +155,6 @@ class Launch(adsk.core.CustomEventHandler):
             progress.progressValue = result['completed']
             progress.message = progress_text(counts, current_activity)
             adsk.doEvents()
-            progress.poll()
         try:
             progress.show('Fusion Backup', progress_text(counts, current_activity), 0, 1, 0)
             if control:
@@ -163,8 +167,6 @@ class Launch(adsk.core.CustomEventHandler):
             report += '\nManual Action: ' + str(len(result['manual']))
             report += '\n\n' + '\n'.join(x['location'] for x in result['manual'][:20])
             report += '\n\n' + '\n'.join((result['errors'] + result['warnings'])[:10])
-            if progress.warnings:
-                report += '\n\n進捗画面の警告:\n' + '\n'.join(progress.warnings)
             report += '\n\nFull results: ' + str(Path(chosen['backup_directory']) / 'last-result.json')
             ui.messageBox(report, 'Backup Result')
             if ui.messageBox('Open Backup Folder?', 'Backup Result', adsk.core.MessageBoxButtonTypes.YesNoButtonType) == adsk.core.DialogResults.DialogYes:
