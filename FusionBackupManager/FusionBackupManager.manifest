@@ -1,0 +1,11 @@
+{
+  "autodeskProduct": "Fusion360",
+  "type": "addin",
+  "id": "c27e0b61-3105-437b-906b-b78409897794",
+  "author": "Fusion Backup Manager contributors",
+  "description": {"": "Read-only semi-automatic local backups with verified incremental history."},
+  "version": "1.0.2",
+  "runOnStartup": false,
+  "supportedOS": "windows",
+  "editEnabled": true
+}

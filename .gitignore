@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+dist/
+installed_backup_*/
