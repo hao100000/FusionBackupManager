@@ -150,6 +150,7 @@ class Launch(adsk.core.CustomEventHandler):
             progress.progressValue = result['completed']
             progress.message = progress_text(counts, current_activity)
             adsk.doEvents()
+            progress.poll()
         try:
             progress.show('Fusion Backup', progress_text(counts, current_activity), 0, 1, 0)
             if control:
@@ -162,6 +163,8 @@ class Launch(adsk.core.CustomEventHandler):
             report += '\nManual Action: ' + str(len(result['manual']))
             report += '\n\n' + '\n'.join(x['location'] for x in result['manual'][:20])
             report += '\n\n' + '\n'.join((result['errors'] + result['warnings'])[:10])
+            if progress.warnings:
+                report += '\n\n進捗画面の警告:\n' + '\n'.join(progress.warnings)
             report += '\n\nFull results: ' + str(Path(chosen['backup_directory']) / 'last-result.json')
             ui.messageBox(report, 'Backup Result')
             if ui.messageBox('Open Backup Folder?', 'Backup Result', adsk.core.MessageBoxButtonTypes.YesNoButtonType) == adsk.core.DialogResults.DialogYes:

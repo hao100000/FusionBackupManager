@@ -109,6 +109,9 @@ class UITests(unittest.TestCase):
         messages = []
         class Progress:
             wasCancelled = False
+            warnings = []
+            def poll(self):
+                pass
             def __setattr__(self, key, value):
                 if key == 'message':
                     messages.append(value)
