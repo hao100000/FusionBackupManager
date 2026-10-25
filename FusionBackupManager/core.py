@@ -248,16 +248,25 @@ class Backup:
             self.log('START destination=' + str(self.root))
             self.report(result, 'preparing')
             store = Store(self.root)  # malformed manifest fails before any export
-            items, warnings = self.adapter.enumerate(projects, self.cancelled)
-            result['warnings'].extend(warnings)
-            result['total'] = len(items)
-            result['total_known'] = True
-            for item in items:
-                for ref in item.references:
-                    result['references'].append(dict(source_file_id=item.file_id, source_version_id=item.version_id, **ref))
+            set_trace = getattr(self.adapter, 'set_trace', None)
+            if callable(set_trace):
+                set_trace(lambda event: self.log('ACTIVITY ' + json.dumps(event, ensure_ascii=False)))
+            stream = getattr(self.adapter, 'iter_items', None)
+            streaming = callable(stream)
+            if streaming:
+                items = stream(projects, self.cancelled, result['warnings'])
+            else:
+                items, warnings = self.adapter.enumerate(projects, self.cancelled)
+                result['warnings'].extend(warnings)
+                result['total'] = len(items)
+                result['total_known'] = True
             for item in items:
                 if self.cancelled():
                     raise Cancelled()
+                if streaming:
+                    result['total'] += 1
+                for ref in item.references:
+                    result['references'].append(dict(source_file_id=item.file_id, source_version_id=item.version_id, **ref))
                 self.report(result, 'checking', item)
                 self.log('FILE ' + json.dumps(item.metadata(), ensure_ascii=False))
                 result['warnings'].extend(item.warnings)
@@ -316,6 +325,9 @@ class Backup:
                     result['skipped'] += 1
                 result['completed'] += 1
                 self.report(result, 'file_error' if file_failed else 'file_done', item)
+                if self.cancelled():
+                    raise Cancelled()
+            result['total_known'] = True
             if self.cancelled():
                 raise Cancelled()
             result['status'] = ('FAILED' if result['failed'] and result['failed'] == result['total']
@@ -348,6 +360,10 @@ class Backup:
                 except OSError:
                     pass  # The returned UI result and error log still report this failure.
             finally:
+                if 'items' in locals() and callable(getattr(items, 'close', None)):
+                    items.close()
+                if callable(getattr(self.adapter, 'set_trace', None)):
+                    self.adapter.set_trace(None)
                 if log:
                     log.close()
                 lock.unlink()

@@ -211,6 +211,86 @@ class AdapterTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, 'matching staged files=2'):
             self.adapter.export(self.item, 'dxf', self.path)
 
+    def test_iterator_yields_before_reading_later_projects(self):
+        accessed = []
+        class LaterRoot:
+            id = 'later-root'
+            @property
+            def dataFiles(self):
+                accessed.append('later')
+                raise ConnectionError('later project unavailable')
+            dataFolders = Collection([])
+        later = NS(id='later', name='Later', rootFolder=LaterRoot())
+        warnings = []
+        iterator = self.adapter.iter_items([self.data.parentProject, later], lambda: False, warnings)
+        first = next(iterator)
+        self.assertEqual(first.file_id, self.data.id)
+        self.assertEqual(accessed, [])
+        self.assertEqual(list(iterator), [])
+        self.assertEqual(accessed, ['later'])
+        self.assertTrue(any('Later' in warning for warning in warnings))
+
+    def test_reference_collection_checks_cancel_between_items(self):
+        stop = [False]
+        calls = []
+        class SlowReferences:
+            count = 10000
+            def item(self, index):
+                calls.append(index)
+                stop[0] = True
+                return source('child-' + str(index))
+        self.data.hasChildReferences = True
+        self.data.childReferences = SlowReferences()
+        with self.assertRaises(Cancelled):
+            self.adapter.enumerate([self.data.parentProject], lambda: stop[0])
+        self.assertEqual(calls, [0])
+
+    def test_folder_cycles_are_detected_instead_of_looping(self):
+        root = self.data.parentProject.rootFolder
+        root.dataFolders = Collection([root])
+        items, warnings = self.adapter.enumerate([self.data.parentProject], lambda: False)
+        self.assertEqual(len(items), 1)
+        self.assertTrue(any('cyclic folder' in warning for warning in warnings))
+
+    def test_deep_reference_chain_does_not_recurse_on_python_stack(self):
+        current = self.data
+        for index in range(1100):
+            child = source('deep-' + str(index))
+            current.hasChildReferences = True
+            current.childReferences = Collection([child])
+            current = child
+        items, warnings = self.adapter.enumerate([self.data.parentProject], lambda: False)
+        self.assertEqual(len(items), 1101)
+        self.assertEqual(warnings, [])
+
+    def test_trace_records_operation_before_blocking_folder_getter(self):
+        events = []
+        adapter = FusionAdapter(self.app, self.fusion)
+        adapter.set_trace(events.append)
+        class BadRoot:
+            id = 'bad-root'
+            @property
+            def dataFiles(self):
+                self_test.assertEqual(events[-1]['phase'], 'listing_files')
+                raise ConnectionError('cloud API unavailable')
+            dataFolders = Collection([])
+        self_test = self
+        project = NS(id='bad', name='Bad Project', rootFolder=BadRoot())
+        items, warnings = adapter.enumerate([project], lambda: False)
+        self.assertEqual(items, [])
+        self.assertTrue(warnings)
+        self.assertTrue(any(event['project'] == 'Bad Project' for event in events))
+
+    def test_real_adapter_streams_through_backup_engine(self):
+        from FusionBackupManager.core import Backup, Store
+        result = Backup(self.temp.name, self.adapter).run([self.data.parentProject])
+        self.assertEqual(result['status'], 'SUCCESS')
+        self.assertEqual(result['exported'], 1)
+        self.assertTrue(result['total_known'])
+        self.assertEqual(len(Store(self.temp.name).data['files']), 1)
+        self.assertEqual(self.docs.opened[0][0].closed, [False])
+        self.assertTrue(any('ACTIVITY' in line for line in Path(result['log_path']).read_text(encoding='utf-8').splitlines()))
+
 
 if __name__ == '__main__':
     unittest.main()

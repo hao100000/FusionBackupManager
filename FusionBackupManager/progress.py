@@ -2,6 +2,9 @@
 PHASES = {
     'preparing': 'バックアップを準備中',
     'enumerating': 'クラウドのファイルを列挙中',
+    'listing_files': 'フォルダのファイル一覧を取得中（Fusion の応答待ち）',
+    'listing_folders': 'サブフォルダ一覧を取得中（Fusion の応答待ち）',
+    'file_metadata': 'ファイル情報を取得中',
     'references': '外部参照を調査中',
     'checking': '保存済みバックアップと差分・ハッシュを確認中',
     'opening': '保存済みの設計を開いています',
@@ -24,7 +27,7 @@ def progress_text(counts, event):
         return str(value or '—').replace('\r', ' ').replace('\n', ' ').replace('%', '％')
     phase = event.get('phase', 'preparing')
     heading = PHASES.get(phase, phase)
-    if phase in ('enumerating', 'references') and 'discovered' in event:
+    if phase in ('enumerating', 'references', 'listing_files', 'listing_folders', 'file_metadata') and 'discovered' in event:
         heading += f" ／ 発見済み {event['discovered']} 件（総数を確認中）"
     lines = [heading, 'プロジェクト: ' + clean(event.get('project')),
              'フォルダ: ' + clean(event.get('folder')),

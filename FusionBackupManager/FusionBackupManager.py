@@ -151,7 +151,7 @@ class Launch(adsk.core.CustomEventHandler):
             progress.message = progress_text(counts, current_activity)
         def update(result, name):
             counts.update(result)
-            progress.maximumValue = max(1, result['total'])
+            progress.maximumValue = max(1, result['total']) if result.get('total_known') else max(1, result['completed'] + 1)
             progress.progressValue = result['completed']
             progress.message = progress_text(counts, current_activity)
             adsk.doEvents()

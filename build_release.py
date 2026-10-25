@@ -6,7 +6,7 @@ import zipfile
 
 def build():
     root = Path(__file__).resolve().parent
-    output = root / 'dist' / 'FusionBackupManager-1.0.5.zip'
+    output = root / 'dist' / 'FusionBackupManager-1.0.6.zip'
     output.parent.mkdir(exist_ok=True)
     with zipfile.ZipFile(output, 'w', zipfile.ZIP_DEFLATED) as archive:
         for source in sorted(root.rglob('*')):

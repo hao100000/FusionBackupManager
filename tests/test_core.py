@@ -327,6 +327,60 @@ class BackupTests(unittest.TestCase):
         b = item(folders=[('same', 'b' + str(i)) for i in range(12)])
         self.assertNotEqual(store.relative_destination(a, 'f3d'), store.relative_destination(b, 'f3d'))
 
+    def test_streaming_saves_before_reading_later_cloud_metadata(self):
+        outer = self
+        class Streaming(Adapter):
+            def iter_items(self, projects, cancelled, warnings):
+                yield self.items[0]
+                outer.assertTrue(Store(outer.root).current(self.items[0], 'f3d'))
+                warnings.append('later cloud folder unavailable')
+        adapter = Streaming([item()])
+        result = Backup(self.root, adapter).run([])
+        self.assertEqual(result['status'], 'PARTIAL')
+        self.assertEqual((result['exported'], result['completed'], result['total']), (1, 1, 1))
+        self.assertTrue(result['total_known'])
+
+    def test_streaming_cancel_keeps_committed_file_and_does_not_read_next(self):
+        next_read = []
+        class Streaming(Adapter):
+            def iter_items(self, projects, cancelled, warnings):
+                yield self.items[0]
+                next_read.append(True)
+                yield self.items[1]
+        adapter = Streaming([item(identity='a'), item(identity='b')])
+        stop = [False]
+        def progress(result, name):
+            if result['completed'] == 1:
+                stop[0] = True
+        result = Backup(self.root, adapter, progress=progress, cancelled=lambda: stop[0]).run([])
+        self.assertEqual(result['status'], 'CANCELLED')
+        self.assertEqual(next_read, [])
+        self.assertEqual(len(Store(self.root).data['files']), 1)
+        self.assertFalse(result['total_known'])
+
+    def test_streaming_partial_files_survive_unexpected_iterator_error(self):
+        class Streaming(Adapter):
+            def iter_items(self, projects, cancelled, warnings):
+                yield self.items[0]
+                raise ConnectionError('cloud listing failed')
+        result = Backup(self.root, Streaming([item()])).run([])
+        self.assertEqual(result['status'], 'FAILED')
+        self.assertEqual(result['exported'], 1)
+        self.assertTrue(verify(self.root)[0]['valid'])
+        self.assertFalse((self.root / '.backup.lock').exists())
+
+    def test_streaming_trace_is_persisted_and_detached_after_run(self):
+        class Streaming(Adapter):
+            def set_trace(self, trace):
+                self.trace = trace
+            def iter_items(self, projects, cancelled, warnings):
+                self.trace(dict(phase='listing_files', project='Project', folder='Parts'))
+                yield self.items[0]
+        adapter = Streaming([item()])
+        result = Backup(self.root, adapter).run([])
+        self.assertIn('listing_files', Path(result['log_path']).read_text(encoding='utf-8'))
+        self.assertIsNone(adapter.trace)
+
 
 if __name__ == '__main__':
     unittest.main()
