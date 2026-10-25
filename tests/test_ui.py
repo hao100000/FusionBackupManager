@@ -23,7 +23,7 @@ class UITests(unittest.TestCase):
         adsk.core = ModuleType('adsk.core')
         adsk.fusion = ModuleType('adsk.fusion')
         for name in ('CommandCreatedEventHandler', 'CommandEventHandler', 'InputChangedEventHandler',
-                     'ValidateInputsEventHandler', 'CustomEventHandler'):
+                     'ValidateInputsEventHandler', 'CustomEventHandler', 'HTMLEventHandler', 'UserInterfaceGeneralEventHandler'):
             setattr(adsk.core, name, type(name, (), {}))
         self.fired = []
         self.project = NS(id='project', name='Project')
@@ -134,7 +134,7 @@ class UITests(unittest.TestCase):
             adapter.enumerate = enumerate_files
             return adapter
         self.ui._queued = (dict(backup_directory=self.temp.name), [self.project])
-        with patch.object(self.ui, 'FusionAdapter', side_effect=factory):
+        with patch.object(self.ui, 'FusionAdapter', side_effect=factory), patch.object(self.ui, 'ProgressDisplay', return_value=progress):
             self.ui.Launch().notify(NS())
         self.assertTrue(any('Scanning Project' in text and '発見済み 1 件' in text for text in messages))
         self.assertTrue(any('SHA-256 を検証中' in text and 'Part' in text and 'F3D' in text for text in messages))

@@ -31,3 +31,7 @@ Autodesk の [2026 年 9 月の更新情報](https://help.autodesk.com/view/fusi
 インストール済み Fusion の SDK も読み取りのみで確認した。production `736d2b4c5e6b95e77c11721da222cf21c6a1fc1f` の `Python/AddInSamples/CommandSample/config.py` は `tools_tab_id = "ToolsTab"` を使用し、CommandSample.py が Utilities タブと説明している。表示言語依存のタブ名検索を避け、この ID を採用。
 
 調査は API の存在・引数の確認であり、出力の完全性や復元成功の証明ではない。Fusion での実機確認は TESTING.md に分けた。
+
+## 左寄せ進捗表示（2026-10-26）
+
+[ProgressDialog](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/core_ProgressDialog.htm) にはテキスト配置のプロパティがない。[Palettes.add](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/core_Palettes_add.htm) と [HTML パレットの公式説明](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/Palettes_UM.htm) に従い、ローカル HTML を表示し CSS で左寄せを指定する。`sendInfoToHTML`、`incomingFromHTML`、`closed` を使う。HTML の受信準備が整うまで最新表示を保持し、ready 通知で送信する。閉じる操作も停止要求として扱う。追加の doEvents は行わず、既存の安全な区切りでのみイベント処理する。

@@ -8,6 +8,7 @@ import adsk.fusion
 from .core import Backup, DEFAULTS, atomic_json
 from .fusion_adapter import FusionAdapter, collection
 from .progress import progress_text
+from .progress_display import ProgressDisplay
 
 COMMAND = 'FusionBackupManagerButton'
 PANEL = 'FusionBackupManagerPanel'
@@ -133,12 +134,11 @@ class Launch(adsk.core.CustomEventHandler):
         ui = app.userInterface
         panel = ui.allToolbarPanels.itemById(PANEL)
         control = panel.controls.itemById(COMMAND) if panel else None
-        progress = ui.createProgressDialog()
+        progress = ProgressDisplay(ui)
         progress.isCancelButtonShown = True
         progress.cancelButtonText = 'Stop Backup'
         counts = {}
         current_activity = dict(phase='preparing')
-        progress.show('Fusion Backup', progress_text(counts, current_activity), 0, 1, 0)
         def activity(event):
             nonlocal current_activity
             current_activity = dict(event)
@@ -151,6 +151,7 @@ class Launch(adsk.core.CustomEventHandler):
             progress.message = progress_text(counts, current_activity)
             adsk.doEvents()
         try:
+            progress.show('Fusion Backup', progress_text(counts, current_activity), 0, 1, 0)
             if control:
                 control.isEnabled = False
             adapter = FusionAdapter(app, adsk.fusion, adsk.doEvents, activity=activity)
