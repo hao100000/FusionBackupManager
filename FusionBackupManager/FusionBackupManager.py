@@ -9,6 +9,8 @@ from .core import Backup, DEFAULTS, atomic_json
 from .fusion_adapter import FusionAdapter, collection
 from .progress import progress_text
 
+VERSION = json.loads(Path(__file__).with_suffix('.manifest').read_text(encoding='utf-8'))['version']
+
 COMMAND = 'FusionBackupManagerButton'
 PANEL = 'FusionBackupManagerPanel'
 EVENT = 'FusionBackupManagerDeferredRun'
@@ -46,12 +48,13 @@ class Created(adsk.core.CommandCreatedEventHandler):
             _projects = list(collection(app.data.dataProjects))
             inputs = args.command.commandInputs
             notice = (
+                f'Fusion Backup Manager {VERSION}\n'
                 '保存済みのクラウド版をバックアップします。未保存の編集は含みません。\n'
                 '開いている設計やその参照先は保護のため出力せず、過去のバックアップは保持します。\n'
                 '外部参照のある設計は、手動のF3Z出力・復元確認が必要です。\n\n'
                 'Projects (multiple) は Selected Projects（複数選択）のときだけ反映されます。\n'
                 'All Projects（全プロジェクト）／Current Project（現在のプロジェクト）では無視されます。')
-            inputs.addTextBoxCommandInput('notice', '', notice, 8, True)
+            inputs.addTextBoxCommandInput('notice', '', notice, 9, True)
             scope = inputs.addDropDownCommandInput('scope', 'Backup Target', adsk.core.DropDownStyles.TextListDropDownStyle)
             for key, label in [('all', 'All Projects'), ('selected', 'Selected Projects'), ('current', 'Current Project')]:
                 scope.listItems.add(label, saved['backup_scope'] == key, '')
@@ -192,7 +195,7 @@ def run(context):
         if not event:
             raise RuntimeError('Could not register deferred backup event')
         bind(event, Launch())
-        definition = ui.commandDefinitions.addButtonDefinition(COMMAND, 'Fusion Backup', 'Back up saved cloud versions locally')
+        definition = ui.commandDefinitions.addButtonDefinition(COMMAND, f'Fusion Backup {VERSION}', '保存済みのクラウド版をローカルにバックアップします')
         bind(definition.commandCreated, Created())
         workspace = ui.workspaces.itemById('FusionSolidEnvironment')
         tab = workspace.toolbarTabs.itemById('ToolsTab')
