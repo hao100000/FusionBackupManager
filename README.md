@@ -1,8 +1,12 @@
-# Fusion Backup Manager 1.0.8
+# Fusion Backup Manager 1.1.0
 
-Autodesk Fusion（Windows）の保存済みクラウドデータをローカルへ半自動バックアップする Python アドインです。追加サービスへの登録、API キー、pip パッケージは不要です。
+Autodesk Fusion（Windows）の保存済みクラウドデータをローカルへ半自動バックアップする Python アドインです。通常のF3D・STEP保存には追加サービスの登録やpipパッケージは不要です。外部参照付き設計のF3Z自動取得を使う場合は、APSのアプリ登録・Client ID・ブラウザー認証が必要です。
 
 1.0.7でABU2027の一部を実機バックアップし、安全な中断と保存済み212ファイルのサイズ・SHA-256一致を確認しました。全件完了前の中断で、外部参照の手動対応と一時フォルダ削除の警告が残っています。以前の実機ログとユーザー報告では、一部のF3D読み込みも確認しています。**大量データの全件完了、今回保存したファイルのFusionでの再読み込み、バックアップ全体の完全復元は未検証です。** 自動テストの結果は [TEST_RESULTS.md](TEST_RESULTS.md)、実機確認手順は [TESTING.md](TESTING.md) を参照してください。`verified` はサイズ・SHA-256 の検証を意味し、Fusion で開ける保証ではありません。
+
+## クラウドAPIによるF3Z取得（1.1.0・試験機能）
+
+画面操作を自動化せず、公式APS Data Management APIでF3Zの生成・取得を要求します。設定の「外部参照のF3Z（APS・試験機能）」から有効化できます。初期状態は無効です。[登録・認証・利用手順](APS_SETUP.md)を確認してください。実クラウド接続・F3Z復元は未検証です。取得済みでも復元確認の手動項目は残します。
 
 ## 終了後の確認（1.0.8）
 
@@ -67,7 +71,7 @@ Fusion 内では同梱 Python を使います。外部 Python のインストー
 4. Output Directory に絶対パスを指定するか Browse で選択します。`C:\FusionBackups` のような短いパスを推奨します。OneDrive 等のローカル同期フォルダも指定できますが、クラウドへの同期完了は本アドインの検証対象外です。保存先は既存バックアップ専用のフォルダにします。
 5. 通常は Fusion Archive、STEP for Assemblies、Skip Unchanged Files を有効にして Start Backup を押します。STEP for All Designs は任意です。旧版の保持は常に有効です。
 6. Stop Backup で処理の区切りに中断できます。Fusion の単一 API 呼び出し中は完了まで待つことがあります。完了済みファイルは残ります。
-7. 結果とログを確認します。手動 F3Z が必要な設計はファイル名を含む Fusion 上の場所を表示します。画面では件数を制限しており、全件は `last-result.json` とログにあります。結果表示後、バックアップフォルダとログをそれぞれ開けます。
+7. 結果とログを確認します。手動 F3Z が必要な設計はファイル名を含む Fusion 上の場所を表示します。画面では件数を制限しており、全件は `last-result.json` とログにあります。結果表示後にフォルダやログを開く確認は表示しません。
 
 バックアップ先の変更は次回起動時に Output Directory を変更します。設定は `%APPDATA%\FusionBackupManager\settings.json` に保存されます。プロジェクトの選択は ID で記録します。Hub を変えた後は選択を見直してください。
 
@@ -87,7 +91,7 @@ Fusion 内では同梱 Python を使います。外部 Python のインストー
 
 外部参照なしの設計は `createFusionArchiveExportOptions` で F3D を出力します。外部参照あり／判定不明の設計は、参照先を再帰列挙して個別にバックアップし、親は既定で STEP を出力します。参照先が選択範囲外のプロジェクトにあっても検出します。アクセス失敗・参照判定失敗は警告します。
 
-公式の [Archive API](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/fusion_ExportManager_createFusionArchiveExportOptions.htm) と [Archive オプション](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/fusion_FusionArchiveExportOptions.htm) では、この用途の完全な F3Z の包含・復元保証を確認できませんでした。拡張子だけを F3Z に変更することはしません。**外部参照あり／不明は常に手動対応が必要です。STEP と個別 F3D だけで元の参照構造を完全復元できるとは扱いません。**
+公式の [Archive API](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/fusion_ExportManager_createFusionArchiveExportOptions.htm) と [Archive オプション](https://help.autodesk.com/cloudhelp/ENU/Fusion-360-API/files/fusion_FusionArchiveExportOptions.htm) では、この用途の完全な F3Z の包含・復元保証を確認できませんでした。拡張子だけを F3Z に変更することはしません。**APSを有効にした外部参照付き設計はF3Z取得を試みます。未取得と参照不明の設計は手動保存が必要で、取得済みの設計も復元確認は手動です。STEP と個別 F3D だけで元の参照構造を完全復元できるとは扱いません。**
 
 参照 JSON の `backed_up` は「API から取得した同一 ID・版の F3D がローカルにありハッシュが一致する」ことを表します。子がさらに外部参照を持つ場合は false になります。アセンブリ内の参照版の一致、設計履歴、ジョイント等の復元は実機検証が必要です。
 
@@ -113,7 +117,7 @@ python .\verify_backup.py 'C:\FusionBackups'
 
 F3D はバックアップのコピーを使い、Fusion のファイル → 開く → コンピュータから開くで開きます。クラウドへのアップロードが必要な場合は、**元と別の復元試験用プロジェクト**にアップロードします。元データへ上書きしません。形状、寸法、部品数、タイムライン等を照合します。
 
-アセンブリは Fusion UI のエクスポートで完全な F3Z を手動保存し、別プロジェクトで復元して参照版・ジョイントまで照合してください。F3Z の手動ファイルはアドインの検証済み記録へ自動登録しません。STEP は形状救済用で、履歴やリンクを保持しません。具体的な安全な検証手順・記録表は TESTING.md にあります。
+F3Z未取得のアセンブリはFusion UIのエクスポートで手動保存してください。APSで取得したF3Zも含め、別の試験プロジェクトで復元して参照版・ジョイントまで照合してください。F3Z の手動ファイルはアドインの検証済み記録へ自動登録しません。STEP は形状救済用で、履歴やリンクを保持しません。具体的な安全な検証手順・記録表は TESTING.md にあります。
 
 ## アンインストール
 

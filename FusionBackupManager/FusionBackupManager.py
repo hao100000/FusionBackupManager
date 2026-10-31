@@ -8,6 +8,7 @@ import adsk.fusion
 from .core import Backup, DEFAULTS, atomic_json
 from .fusion_adapter import FusionAdapter, collection
 from .progress import progress_text
+from .aps import Archives, Tokens, TokenStore, valid_client_id
 
 VERSION = json.loads(Path(__file__).with_suffix('.manifest').read_text(encoding='utf-8'))['version']
 
@@ -51,7 +52,7 @@ class Created(adsk.core.CommandCreatedEventHandler):
                 f'Fusion Backup Manager {VERSION}\n'
                 '保存済みのクラウド版をバックアップします。未保存の編集は含みません。\n'
                 '開いている設計やその参照先は保護のため出力せず、過去のバックアップは保持します。\n'
-                '外部参照のある設計は、手動のF3Z出力・復元確認が必要です。\n\n'
+                '外部参照のF3Z自動取得は下のAPS設定で有効にできます。復元確認は手動です。\n\n'
                 'Projects (multiple) は Selected Projects（複数選択）のときだけ反映されます。\n'
                 'All Projects（全プロジェクト）／Current Project（現在のプロジェクト）では無視されます。')
             inputs.addTextBoxCommandInput('notice', '', notice, 9, True)
@@ -67,6 +68,13 @@ class Created(adsk.core.CommandCreatedEventHandler):
                                ('export_step_for_assemblies', 'STEP for Assemblies'),
                                ('export_step', 'STEP for All Designs'), ('incremental', 'Skip Unchanged Files')]:
                 inputs.addBoolValueInput(key, label, True, '', saved[key])
+            group = inputs.addGroupCommandInput('aps_group', '外部参照のF3Z（APS・試験機能）')
+            group.isExpanded = False
+            group.children.addBoolValueInput('cloud_f3z', 'クラウドAPIでF3Zを取得', True, '', saved['cloud_f3z'])
+            group.children.addStringValueInput('aps_client_id', 'APS Client ID', saved['aps_client_id'])
+            group.children.addTextBoxCommandInput('aps_notice', '',
+                'APSアプリの登録が必要です。初回はブラウザーでAutodeskにログインしてください。\n'
+                'Client Secretは不要です。停止してもクラウドの生成ジョブは後から完了する場合があります。', 3, True)
             inputs.addBoolValueInput('keep_versions', 'Keep Old Versions (required)', True, '', True).isEnabled = False
             args.command.okButtonText = 'Start Backup'
             bind(args.command.inputChanged, Changed())
@@ -87,12 +95,20 @@ class Changed(adsk.core.InputChangedEventHandler):
                 args.inputs.itemById('directory').value = dialog.folder
 
 
+def aps_inputs(inputs):
+    group = inputs.itemById('aps_group')
+    return group.children if group else inputs
+
+
 class Validate(adsk.core.ValidateInputsEventHandler):
     def notify(self, args):
         inputs = args.inputs
         scope = inputs.itemById('scope').selectedItem.index
         selected = any(x.isSelected for x in collection(inputs.itemById('projects').listItems))
-        args.areInputsValid = bool(inputs.itemById('directory').value.strip()) and (scope != 1 or selected) and (
+        cloud = aps_inputs(inputs).itemById('cloud_f3z')
+        client_id = aps_inputs(inputs).itemById('aps_client_id')
+        cloud_valid = not (cloud and cloud.value) or bool(client_id and valid_client_id(client_id.value.strip()) and inputs.itemById('export_fusion_archive').value)
+        args.areInputsValid = cloud_valid and bool(inputs.itemById('directory').value.strip()) and (scope != 1 or selected) and (
             inputs.itemById('export_fusion_archive').value or inputs.itemById('export_step').value)
 
 
@@ -114,6 +130,12 @@ class Execute(adsk.core.CommandEventHandler):
                           project_ids=[p.id for p in selected])
             for key in ('export_fusion_archive', 'export_step_for_assemblies', 'export_step', 'incremental'):
                 chosen[key] = inputs.itemById(key).value
+            cloud = aps_inputs(inputs).itemById('cloud_f3z')
+            client_id = aps_inputs(inputs).itemById('aps_client_id')
+            chosen['cloud_f3z'] = bool(cloud and cloud.value)
+            chosen['aps_client_id'] = client_id.value.strip() if client_id else ''
+            if chosen['cloud_f3z'] and (not chosen['export_fusion_archive'] or not valid_client_id(chosen['aps_client_id'])):
+                raise ValueError('APS F3Z requires Fusion Archive and an APS Client ID')
             atomic_json(_config, chosen)
             _pending = (chosen, selected)
         except Exception as exc:
@@ -162,12 +184,16 @@ class Launch(adsk.core.CustomEventHandler):
             progress.show('Fusion Backup', progress_text(counts, current_activity), 0, 1, 0)
             if control:
                 control.isEnabled = False
-            adapter = FusionAdapter(app, adsk.fusion, adsk.doEvents, activity=activity)
+            cloud = None
+            if chosen.get('cloud_f3z'):
+                cloud = Archives(Tokens(chosen.get('aps_client_id', ''),
+                                        TokenStore(_config.parent / 'aps-tokens.json')))
+            adapter = FusionAdapter(app, adsk.fusion, adsk.doEvents, activity=activity, cloud=cloud)
             result = Backup(chosen['backup_directory'], adapter, chosen, update,
                             lambda: progress.wasCancelled, activity=activity).run(projects)
             progress.hide()
             report = '\n'.join(f'{key}: {result[key]}' for key in ('status', 'total', 'completed', 'exported', 'skipped', 'failed'))
-            report += '\nManual Action: ' + str(len(result['manual']))
+            report += '\n手動確認（F3Z未取得／復元未検証）: ' + str(len(result['manual']))
             report += '\n\n' + '\n'.join(x['location'] for x in result['manual'][:20])
             report += '\n\n' + '\n'.join((result['errors'] + result['warnings'])[:10])
             report += '\n\nFull results: ' + str(Path(chosen['backup_directory']) / 'last-result.json')

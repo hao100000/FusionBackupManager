@@ -12,7 +12,7 @@ from test_adapter import Collection
 
 class Inputs(dict):
     def itemById(self, key):
-        return self[key]
+        return self.get(key)
 
 
 class UITests(unittest.TestCase):
@@ -38,7 +38,7 @@ class UITests(unittest.TestCase):
         spec.loader.exec_module(self.ui)
         self.ui._config = Path(self.temp.name) / 'settings.json'
         self.ui._projects = [self.project, NS(id='second', name='Second')]
-        self.inputs = Inputs(scope=NS(selectedItem=NS(index=1)),
+        self.inputs = Inputs(cloud_f3z=NS(value=False), aps_client_id=NS(value=''), scope=NS(selectedItem=NS(index=1)),
                              projects=NS(listItems=Collection([NS(isSelected=True), NS(isSelected=True)])),
                              directory=NS(value=self.temp.name))
         for key in ('export_fusion_archive', 'export_step_for_assemblies', 'incremental'):
@@ -154,3 +154,33 @@ class UITests(unittest.TestCase):
         self.inputs['projects'].listItems.items[1].isSelected = True
         self.ui.Execute().notify(NS(command=NS(commandInputs=self.inputs)))
         self.assertEqual([p.id for p in self.ui._pending[1]], ['second'])
+
+    def test_cloud_requires_archive_and_client_id_and_preserves_selection(self):
+        self.inputs['cloud_f3z'].value = True
+        args = NS(inputs=self.inputs)
+        self.ui.Validate().notify(args)
+        self.assertFalse(args.areInputsValid)
+        self.inputs['aps_client_id'].value = 'public-client-id'
+        self.ui.Validate().notify(args)
+        self.assertTrue(args.areInputsValid)
+        self.ui.Execute().notify(NS(command=NS(commandInputs=self.inputs)))
+        self.assertTrue(self.ui._pending[0]['cloud_f3z'])
+        self.assertEqual(self.ui._pending[0]['aps_client_id'], 'public-client-id')
+        self.assertEqual(self.ui._pending[0]['backup_directory'], self.temp.name)
+        self.inputs['export_fusion_archive'].value = False
+        self.ui.Validate().notify(args)
+        self.assertFalse(args.areInputsValid)
+
+    def test_cloud_group_children_are_read_from_group_not_root(self):
+        child_inputs=Inputs(cloud_f3z=NS(value=True),aps_client_id=NS(value='public-client-id'))
+        self.inputs.pop('cloud_f3z'); self.inputs.pop('aps_client_id')
+        self.inputs['aps_group']=NS(children=child_inputs)
+        args=NS(inputs=self.inputs)
+        self.ui.Validate().notify(args)
+        self.assertTrue(args.areInputsValid)
+        self.ui.Execute().notify(NS(command=NS(commandInputs=self.inputs)))
+        self.assertTrue(self.ui._pending[0]['cloud_f3z'])
+        self.assertEqual(self.ui._pending[0]['aps_client_id'],'public-client-id')
+        child_inputs['aps_client_id'].value='not a client id'
+        self.ui.Validate().notify(args)
+        self.assertFalse(args.areInputsValid)

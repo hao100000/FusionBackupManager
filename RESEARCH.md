@@ -45,3 +45,8 @@ Autodesk の [2026 年 9 月の更新情報](https://help.autodesk.com/view/fusi
 ## 外部参照付きアセンブリの追加調査（2026-11-01）
 
 [配布を前提としたF3Z保存経路の調査](ASSEMBLY_BACKUP_RESEARCH.md)に、公式APSクラウドAPI・PKCE認証と、Fusion内部テキストコマンドの候補を記録した。画面操作に依存しない経路がある。両方式とも実機出力・復元は未検証で、現行1.0.8は既存のフォールバックを維持する。
+
+
+## APS方式の試作実装（1.1.0、2026-11-01）
+
+追加調査のAPS方式を試験機能として実装。DataProject.idとDataFile.versionIdの公式SDK説明にAPSと同じIDである旨があるため、URLエンコードして使用する。公式OpenAPIに従いdownloadFormats、POST downloads、GET jobsの303、download詳細、OSS署名ダウンロードを使用。PKCEとDPAPIによる認証保存を追加した。実通信・復元は未検証で、導入手順と制約はAPS_SETUP.md、テスト結果はTEST_RESULTS.mdに分離して記録する。

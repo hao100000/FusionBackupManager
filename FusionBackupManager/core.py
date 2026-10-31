@@ -1,4 +1,4 @@
-"""Backup engine. No Fusion imports, credentials, or cloud write operations."""
+"""Backup engine. No Fusion imports, credentials, or source design writes."""
 import hashlib
 import json
 import os
@@ -111,7 +111,7 @@ class Item:
 
 DEFAULTS = dict(backup_directory='', backup_scope='selected', project_ids=[],
                 export_fusion_archive=True, export_step_for_assemblies=True,
-                export_step=False, incremental=True, keep_versions=True)
+                export_step=False, incremental=True, keep_versions=True, cloud_f3z=False, aps_client_id='')
 
 
 class Store:
@@ -206,6 +206,10 @@ def formats(item, settings):
         result.append('f3d')
     if settings.get('export_step') or (item.reference_state != 'none' and settings['export_step_for_assemblies']):
         result.append('step')
+    # Keep STEP if the optional cloud archive fails; it is committed first.
+    if (settings.get('cloud_f3z') and settings['export_fusion_archive']
+            and item.reference_state == 'external'):
+        result.append('f3z')
     return result
 
 
@@ -272,9 +276,11 @@ class Backup:
                 result['warnings'].extend(item.warnings)
                 if item.extension in ('f3d', 'f3z') and not self.settings['export_fusion_archive']:
                     result['warnings'].append(item.location() + ': native archive disabled; STEP preserves shape only')
+                manual_entry = None
                 if item.reference_state != 'none':
                     result['manual'].append(dict(file_id=item.file_id, version_id=item.version_id,
                                                   location=item.location(), reason='Manual F3Z export and restore test required; references=' + item.reference_state))
+                    manual_entry = result['manual'][-1]
                 changed = False
                 file_failed = False
                 try:
@@ -303,10 +309,15 @@ class Backup:
                             self.report(result, 'verifying', item, fmt)
                             size, digest = fingerprint(temp)
                             self.report(result, 'publishing', item, fmt)
+                            if fmt == 'f3z' and self.cancelled():
+                                raise Cancelled()
                             publish(temp, target)
                         entry = dict(item.metadata(), local_path=target.relative_to(self.root).as_posix(),
                                      format=fmt, size=size, sha256=digest, status='verified',
                                      verification='bytes_sha256_only; Fusion restore untested', backed_up_at=now())
+                        if fmt == 'f3z':
+                            entry.update(archive_origin='aps_downloads', restore_tested=False,
+                                         verification='bytes_sha256_and_zip_crc_structure_only; Fusion restore untested')
                         store.data['files'].append(entry)
                         self.report(result, 'recording', item, fmt)
                         store.save()
@@ -321,6 +332,8 @@ class Backup:
                     result['failed'] += 1
                     result['errors'].append(item.location() + ': ' + str(exc))
                     self.log('ERROR ' + result['errors'][-1])
+                if manual_entry is not None and store.current(item, 'f3z'):
+                    manual_entry['reason'] = 'F3Z downloaded; manual Fusion restore test required'
                 if not changed and not file_failed:
                     result['skipped'] += 1
                 result['completed'] += 1

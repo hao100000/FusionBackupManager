@@ -13,6 +13,8 @@ CONTRACTS = {
         'ValidateInputsEventArgs': 'inputs areInputsValid',
         'CommandEventArgs': 'command executeFailed executeFailedMessage',
         'InputChangedEventArgs': 'input inputs',
+        'CommandInputs': 'addGroupCommandInput addStringValueInput addBoolValueInput addTextBoxCommandInput',
+        'GroupCommandInput': 'children isExpanded',
         'Command': 'okButtonText destroy execute inputChanged validateInputs',
         'ProgressDialog': 'maximumValue message wasCancelled cancelButtonText isCancelButtonShown',
         'DropDownStyles': 'CheckBoxDropDownStyle TextListDropDownStyle',

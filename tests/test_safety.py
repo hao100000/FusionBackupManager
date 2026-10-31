@@ -23,3 +23,13 @@ class SafetyTests(unittest.TestCase):
         for source in root.rglob('*.py'):
             if 'dist' not in source.parts:
                 ast.parse(source.read_text(encoding='utf-8'), filename=str(source), feature_version=(3, 10))
+
+    def test_cloud_client_has_no_source_write_or_pc_automation_calls(self):
+        from FusionBackupManager.aps import check_route, API, APSError
+        for method,path in [('POST','/data/v1/projects/p/items'),('POST','/data/v1/projects/p/versions'),
+                            ('POST','/data/v1/projects/p/folders'),('PATCH','/data/v1/projects/p/items/i'),
+                            ('DELETE','/data/v1/projects/p/items/i')]:
+            with self.assertRaises(APSError): check_route(method,API+path)
+        source=(Path(__file__).parents[1]/'FusionBackupManager/aps.py').read_text(encoding='utf-8')
+        self.assertNotIn('executeTextCommand',source)
+        self.assertNotIn('client_secret',source)

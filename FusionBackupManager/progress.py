@@ -1,5 +1,11 @@
 """Human-readable progress without Fusion dependencies."""
 PHASES = {
+    'cloud_auth': 'APSの認証中（初回はブラウザーでログイン）',
+    'cloud_formats': 'クラウドで利用できる保存形式を確認中',
+    'cloud_queued': 'クラウドへF3Z生成を要求中',
+    'cloud_wait': 'クラウドでF3Zを生成中（Stop Backupで待機を中断）',
+    'cloud_download': 'クラウドからF3Zをダウンロード中',
+    'cloud_validate': 'F3Zの構造・CRCを検証中',
     'preparing': 'バックアップを準備中',
     'enumerating': 'クラウドのファイルを列挙中',
     'listing_files': 'フォルダのファイル一覧を取得中（Fusion の応答待ち）',

@@ -291,6 +291,37 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(self.docs.opened[0][0].closed, [False])
         self.assertTrue(any('ACTIVITY' in line for line in Path(result['log_path']).read_text(encoding='utf-8').splitlines()))
 
+    def test_cloud_archive_download_does_not_open_or_save_fusion_document(self):
+        calls=[]
+        class Cloud:
+            def export(inner,item,path,checkpoint,report):
+                checkpoint(); report('cloud_download')
+                calls.append((item.version_id,str(path)))
+                Path(path).write_bytes(b'cloud archive mock')
+        self.adapter.cloud=Cloud()
+        self.item.reference_state='external'
+        self.adapter.export(self.item,'f3z',self.path)
+        self.assertEqual(self.docs.opened,[])
+        self.assertEqual(calls[0][0],self.item.version_id)
+        self.assertTrue(self.path.exists())
+
+    def test_cloud_archive_still_protects_open_designs_and_dependencies(self):
+        called=[]
+        self.adapter.cloud=NS(export=lambda *args:called.append(True))
+        self.item.reference_state='external'
+        self.docs.items=[Document(self.data)]
+        with self.assertRaisesRegex(RuntimeError,'open in Fusion'):
+            self.adapter.export(self.item,'f3z',self.path)
+        self.assertEqual(called,[])
+
+    def test_cloud_archive_refuses_changed_version_after_download(self):
+        def output(item,path,checkpoint,report):
+            self.data.versionId='different-version'
+        self.adapter.cloud=NS(export=output)
+        self.item.reference_state='external'
+        with self.assertRaisesRegex(RuntimeError,'changed during'):
+            self.adapter.export(self.item,'f3z',self.path)
+
 
 if __name__ == '__main__':
     unittest.main()

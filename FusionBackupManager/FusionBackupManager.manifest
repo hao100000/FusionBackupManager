@@ -6,7 +6,7 @@
   "description": {
     "": "保存済みのクラウド版をローカルにバックアップします。元データは変更せず、過去のバックアップを保持します。"
   },
-  "version": "1.0.8",
+  "version": "1.1.0",
   "runOnStartup": false,
   "supportedOS": "windows",
   "editEnabled": true

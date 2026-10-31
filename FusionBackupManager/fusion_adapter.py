@@ -17,8 +17,9 @@ def collection(values, checkpoint=None):
 
 
 class FusionAdapter:
-    def __init__(self, app, fusion, pump=lambda: None, activity=None):
+    def __init__(self, app, fusion, pump=lambda: None, activity=None, cloud=None):
         self.app, self.fusion, self.pump = app, fusion, pump
+        self.cloud = cloud
         self.activity = activity or (lambda event: None)
         self.trace = lambda event: None
         self._cancelled = lambda: False
@@ -198,6 +199,13 @@ class FusionAdapter:
                 raise RuntimeError('Design or dependency is open in Fusion. Close it manually; only saved cloud versions are backed up. Unsaved edits are excluded.')
         if getattr(data_file, 'isConfiguration', False) or getattr(data_file, 'isConfiguredDesign', False):
             raise RuntimeError('Configured designs require manual archive and restore validation')
+        if fmt == 'f3z':
+            if self.cloud is None or item.reference_state != 'external':
+                raise RuntimeError('APS cloud F3Z is not enabled for this design')
+            self.cloud.export(item, path, self.checkpoint, lambda phase: self.report(phase, item, fmt))
+            if data_file.versionId != item.version_id:
+                raise RuntimeError('Cloud version changed during archive download; output refused')
+            return
         original = self.app.activeDocument
         document = None
         owned = False
