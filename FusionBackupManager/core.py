@@ -286,7 +286,11 @@ class Backup:
                 try:
                     wanted = formats(item, self.settings)
                     if not wanted:
-                        raise ValueError('No export format enabled for this file')
+                        # A format can be intentionally disabled for external-reference
+                        # assemblies. Record that as a skip; manual F3Z guidance was
+                        # already added above when references were detected.
+                        self.log('SKIP no export format enabled')
+                        self.report(result, 'skipped', item)
                     for fmt in wanted:
                         self.report(result, 'checking', item, fmt)
                         if self.cancelled():

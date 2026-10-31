@@ -112,6 +112,19 @@ class BackupTests(unittest.TestCase):
         self.assertEqual(second['skipped'], 2)
         self.assertEqual(adapter.calls, [])
 
+    def test_assemblies_with_all_outputs_disabled_are_skipped_not_failed(self):
+        adapter = Adapter([item(reference_state='external')])
+        result = Backup(self.root, adapter, settings={
+            'export_step_for_assemblies': False,
+            'export_step': False,
+        }).run(['project'])
+        self.assertEqual(result['status'], 'PARTIAL')
+        self.assertEqual(result['failed'], 0)
+        self.assertEqual(result['skipped'], 1)
+        self.assertEqual(len(result['manual']), 1)
+        self.assertEqual(adapter.calls, [])
+        self.assertIn('SKIP no export format enabled', Path(result['log_path']).read_text(encoding='utf-8'))
+
     def test_unknown_references_never_native_success(self):
         result, adapter = self.run_backup([item(reference_state='unknown')])
         self.assertEqual(result['status'], 'PARTIAL')
