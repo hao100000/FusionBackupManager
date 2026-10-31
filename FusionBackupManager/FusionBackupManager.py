@@ -172,10 +172,6 @@ class Launch(adsk.core.CustomEventHandler):
             report += '\n\n' + '\n'.join((result['errors'] + result['warnings'])[:10])
             report += '\n\nFull results: ' + str(Path(chosen['backup_directory']) / 'last-result.json')
             ui.messageBox(report, 'Backup Result')
-            if ui.messageBox('Open Backup Folder?', 'Backup Result', adsk.core.MessageBoxButtonTypes.YesNoButtonType) == adsk.core.DialogResults.DialogYes:
-                os.startfile(chosen['backup_directory'])
-            if result.get('log_path') and ui.messageBox('Open Log?', 'Backup Result', adsk.core.MessageBoxButtonTypes.YesNoButtonType) == adsk.core.DialogResults.DialogYes:
-                os.startfile(result['log_path'])
         except Exception:
             ui.messageBox('Backup failed:\n' + traceback.format_exc())
         finally:
